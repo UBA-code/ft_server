@@ -11,10 +11,3 @@ RUN apt-get install vim -y
 # mysql, php
 RUN apt install -y default-mysql-server php php-bcmath php-curl php-imagick php-intl php-json php-mbstring  php-mysql php-xml php-zip wget
 
-
-RUN mkdir -p /var/www/UBA/wordpress/
-
-COPY ./srcs/wordpress /var/www/UBA/wordpress/
-
-WORKDIR /var/www/UBA/wordpress
-
