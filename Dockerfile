@@ -1,6 +1,20 @@
-FROM debian
+FROM debian:buster
 RUN apt-get update
 RUN apt-get install nginx -y
-RUN apt-get install systemctl -y
+RUN apt-get install systemd -y
 RUN apt-get install network-manager -y
-RUN service nginx start
+RUN apt-get install vim -y
+
+
+# install Project dependencies
+
+# mysql, php
+RUN apt install -y default-mysql-server php php-bcmath php-curl php-imagick php-intl php-json php-mbstring  php-mysql php-xml php-zip wget
+
+
+RUN mkdir -p /var/www/UBA/wordpress/
+
+COPY ./srcs/wordpress /var/www/UBA/wordpress/
+
+WORKDIR /var/www/UBA/wordpress
+

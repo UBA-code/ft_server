@@ -1,0 +1,206 @@
+==============================
+INITIAL SERVER SETUP DEBAIN 10
+==============================
+Login to Server:
+ssh root@your_server_ip
+
+apt update -y && apt upgrade -y
+
+adduser debian
+
+usermod -a -G sudo debian
+
+Configure SSH :
+nano /etc/ssh/sshd_config
+
+Add and change the information:
+Port 22500
+Protocol 2
+PermitRootLogin no
+
+Add to End of File :
+UseDNS no
+AllowUsers debian
+
+Save and Close
+
+Restart SSH service:
+systemctl restart ssh.service
+
+Logout:
+
+Ctrl+D
+
+Login using user with sudo privilages:
+ssh -p 22500 user@ip_address
+
+==============================
+INSTALL NGINX, PHP AND MARIADB
+==============================
+Install Nginx, MariaDB, PHP, and other PHP modules :
+sudo apt install nginx mariadb-server mariadb-client php-cgi php-common php-fpm php-pear php-mbstring php-zip php-net-socket php-gd php-xml-util php-gettext php-mysql php-bcmath unzip wget git curl -y
+
+Open the php.ini file:
+sudo nano /etc/php/7.3/fpm/php.ini
+
+Make the following changes:
+post_max_size = 64M
+memory_limit = 256M
+max_execution_time = 300
+upload_max_filesize = 32M 
+date.timezone = America/Chicago //optional
+
+Save and Close :
+Ctrl O+X
+
+Restart PHP-FPM service:
+sudo systemctl restart php7.3-fpm.service
+
+==============================
+CONFIGURE NGINX FOR WORDPRESS
+==============================
+Create root directory:
+sudo mkdir /var/www/domain
+
+sudo nano /etc/nginx/sites-available/domain.name
+
+------------------------------
+server {
+        listen 80;
+        root /var/www/linuxscoop.cc;
+        index index.php;
+        server_name domain.name www.domain.name;
+
+        access_log /var/log/nginx/domain.name_access.log;
+        error_log /var/log/nginx/domain.name_error.log;
+
+        client_max_body_size 64M;
+    	  location = /favicon.ico {
+        	log_not_found off;
+        	access_log off;
+    	  }
+
+    	 location = /robots.txt {
+       	allow all;
+       	log_not_found off;
+       	access_log off;
+	  }
+
+        location / {
+                try_files $uri $uri/ /index.php?$args;
+                }
+
+        location ~ \.php$ {
+                try_files $uri =404;
+                include /etc/nginx/fastcgi_params;
+                fastcgi_read_timeout 3600s;
+                fastcgi_buffer_size 128k;
+                fastcgi_buffers 4 128k;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_pass unix:/run/php/php7.3-fpm.sock;
+                fastcgi_index index.php;
+                }
+    	  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        	    expires max;
+        	   log_not_found off;
+    		}
+      }
+------------------------------
+sudo nginx -t
+sudo ln -s /etc/nginx/sites-available/domain.name.conf /etc/nginx/sites-enabled/
+sudo systemctl restart nginx.service
+sudo systemctl restart php7.3-fpm.service
+
+==============================
+CONFIGURE A WORDPRESS DATABASE
+==============================
+sudo mysql_secure_installation
+
+mysql -u root -p
+
+CREATE DATABASE dbwordpress DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;
+
+GRANT ALL ON dbwordpress.* TO 'wpuser'@'localhost' IDENTIFIED BY '5tR0n6p@s5WorD';
+
+FLUSH PRIVILEGES;
+
+EXIT;
+
+==============================
+INSTALL WORDPRESS
+==============================
+cd /tmp
+wget https://wordpress.org/latest.tar.gz
+tar -xvzf latest.tar.gz
+cd wordpress
+cp /tmp/wordpress/wp-config-sample.php /tmp/wordpress/wp-config.php
+sudo cp -av wordpress/. /var/www/domain/
+
+WordPress secret key generator :
+curl -s https://api.wordpress.org/secret-key/1.1/salt/
+------------------------------
+define('AUTH_KEY',         '|V^%QD3_3G*Q7oaQRYtC).`CRE2c(pOf rR9D8|%G-y~=AmGH.bhf.vYJ1j~-wQR');
+define('SECURE_AUTH_KEY',  '_Wa.<dawj6|+w0%0:K3D<0;+d,|]H7-oea,CVT_(2ha~+N(&7d+] ${-RA#^S9o<');
+define('LOGGED_IN_KEY',    'hQH<I^d3G20Lp,ep%>f}m#beM9|vL&Yxt5iJwK4qlK25Qe#_+Np4Su?WZzQ~)+@R');
+define('NONCE_KEY',        ')b(/p}n{+BR=<| ^Hs=7G<A?Q9C?X=}fnR2x8r)U-V;|-|A4G:zV58pxicLd~G%/');
+define('AUTH_SALT',        'HLJl6K5b4uGPsb^ev?E!Qi<4_0PD[z/|.CNx+cM8 O-&Qe l(tQ_j#@ellU)kd +');
+define('SECURE_AUTH_SALT', 'sw1uE~TgH5~gYK23kdvn_p.<yS,G{8_G^=.m)1Y2U+34vvQWK4}D[}} %K:w^tw=');
+define('LOGGED_IN_SALT',   'y1Yb 2xG;yHgN*&*L|i2{mrfdGmPX2.E|l=U%gekC$x@G;dxTIL|-cw]zJZv{- <');
+define('NONCE_SALT',       '.coEf^|KY.|$`>MmuW5H(bEFY&_*r4Jky(Dh?,M6V)`!867aG~9-V+ESJK}rq9`8');
+------------------------------
+sudo nano /var/www/linuxscoop/wp-config.php
+------------------------------
+// ** MySQL settings - You can get this info from your web host ** //
+/** The name of the database for WordPress */
+define( 'DB_NAME', 'database_name' );
+
+/** MySQL database username */
+define( 'DB_USER', 'database_user' );
+
+/** MySQL database password */
+define( 'DB_PASSWORD', 'database_passsword' );
+
+/** MySQL hostname */
+define( 'DB_HOST', 'localhost' );
+------------------------------
+sudo chown -Rv www-data:www-data /var/www/domain/
+
+==============================
+INSTALL AND CONFIGURE
+LET'S ENCRYPT SSL CERTIFICATE
+==============================
+sudo apt install python3-acme python3-certbot python3-mock python3-openssl python3-pkg-resources python3-pyparsing python3-zope.interface
+sudo apt install python3-certbot-nginx
+sudo certbot --nginx -d domain.name -d www.domain.name
+
+Renew :
+sudo certbot renew --dry-run
+==============================
+SETTING UP FIREWALL
+==============================
+sudo apt install ufw
+sudo ufw enable
+sudo ufw app list
+sudo ufw allow 22500/tcp comment 'Open port ssh tcp port 22500'
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw status
+
+==============================
+COMPLETE WORDPRESS SETUP
+==============================
+Install wordpress through Web Browser
+
+
+
+
+
+
+
+
+
+
+
+
+
+
